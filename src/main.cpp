@@ -1,43 +1,53 @@
 //#include<ESP32Time.h>
 #include<Arduino.h>
-const int pinEncoder = 2; 
-volatile int cntPulsos = 0; 
+const int pinEncoder = 2;
+unsigned int cntPulsos = 0, cntTiempo = 0, bloqueTiempo;
+float distanciaM = 0, distanciaT = 0;
+float distanciaPulsos, Vmps;
+unsigned long tAct = 0, tAnt = 0;
+float tDif = 0;
 
-volatile float distanciaM=0;
+unsigned long lastDebounceTime = 0;  
+unsigned long debounceDelay = 12;  
 
-//ESP32Time rtc(3600);
 
+//Funcion de interrupcion
 void IRAM_ATTR contadorPulsos_ISR() {
-  cntPulsos++;
-  
-  
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    cntPulsos++;
+    tAct = micros();
+  }
 }
 
 void setup() {
   Serial.begin(115200);
+
   pinMode(pinEncoder, INPUT);
-  attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING); //o CHANGE
-  //rtc.setTime(1609459200);
+  attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
+
 }
 
 void loop() {
-  
-  //Revisar los pulsos de encoder por revolucion, son los 200.0
-  float distanciaPulsos = cntPulsos / 200.0;
 
-  distanciaM = distanciaM + (distanciaPulsos * 2 * PI * 30)/100; //30 son el radio de la rueda
-  
-  //float Vmps = distanciaM / rtc.getSecond();
 
-  Serial.print("Distancia pulsos: ");
-  Serial.println(distanciaPulsos);
-  Serial.print("Distancia (m): ");
-  Serial.println(distanciaM);
-  //Serial.print("Velocidad (m/s): ");
-  //Serial.println(Vmps);
- 
-  
-  cntPulsos = 0;
+  //mediciones en el encoder
+  cntTiempo = millis() - bloqueTiempo;
+  if (cntTiempo >= 1000) {
+    bloqueTiempo += cntTiempo;
 
-  delay(1000);
+    distanciaM = ((cntPulsos / 16.0) * 2 * PI * 0.32);
+    distanciaT += distanciaM;
+    Vmps = distanciaM / (cntTiempo / 1000.0)*3.66667;
+    Serial.print("Cant pulsos: ");
+    Serial.println(cntPulsos);
+    Serial.print("Distancia pulsos: ");
+    Serial.println(distanciaPulsos);
+    Serial.print("Distancia (m): ");
+    Serial.println(distanciaT);
+    Serial.print("Velocidad (km/h): ");
+    Serial.println(Vmps);
+
+    cntPulsos = 0;
+  }
+  delay(1);
 }
