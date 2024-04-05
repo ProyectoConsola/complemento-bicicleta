@@ -1,6 +1,8 @@
 // #include<ESP32Time.h>
 #include <Arduino.h>
+#include "esp32-hal.h"
 #include "fabgl.h"
+#include <cstdint>
 #include <iostream>
 #include <stdlib.h>
 
@@ -10,23 +12,27 @@ using std::string;
 fabgl::VGAController DisplayController;
 fabgl::Canvas canvas(&DisplayController);
 
+constexpr uint64_t DEBOUNCE_DELAY_MILLIS = 12;
 const int pinEncoder = 12;
-unsigned int cntPulsos = 0, cntTiempo = 0, bloqueTiempo;
+unsigned int pulseCount = 0, cntTiempo = 0, bloqueTiempo;
 float distanciaM = 0, distanciaT = 0;
 float distanciaPulsos, Vmps;
-unsigned long tAct = 0, tAnt = 0;
+unsigned long tAnt = 0;
 float tDif = 0;
 
-unsigned long lastDebounceTime = 0;
-unsigned long debounceDelay = 12;
 
-// Funcion de interrupcion
-void IRAM_ATTR contadorPulsos_ISR()
+/*
+ * Función de interrupción para contar pulsos.
+ * Aumenta pulsos si pasó un tiempo mínimo determinado, este tiempo mínimo es
+ * determinado por la constante DEBOUNCE_DELAY_MILLIS.
+ */
+void IRAM_ATTR pulseCounterISR()
 {
-  if ((millis() - lastDebounceTime) > debounceDelay)
-  {
-    cntPulsos++;
-    tAct = micros();
+  static uint64_t lastRegisteredPulse = 0;
+  const uint64_t currentTimeMillis = millis();
+  if ((currentTimeMillis - lastRegisteredPulse) > DEBOUNCE_DELAY_MILLIS) {
+    pulseCount += 1;
+    lastRegisteredPulse = currentTimeMillis;
   }
 }
 
@@ -71,10 +77,10 @@ struct SpeedOmeter : public Scene
     if (cntTiempo >= 1000)
     {
       bloqueTiempo += cntTiempo;
-      distanciaM = ((cntPulsos / 16.0) * 2 * PI * 0.32);
+      distanciaM = ((pulseCount / 16.0) * 2 * PI * 0.32);
       distanciaT += distanciaM;
       Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667;
-      cntPulsos = 0;
+      pulseCount = 0;
     }
 
     char strDistancia[20];
@@ -109,7 +115,7 @@ void setup()
 {
   Serial.begin(115200);
   pinMode(pinEncoder, INPUT);
-  attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(pinEncoder), pulseCounterISR, RISING);
   DisplayController.begin();
   DisplayController.setResolution(VGA_320x200_75Hz);
   Serial.println("¡Listo!");
