@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <stdlib.h>
+#include <sys/_stdint.h>
 
 using fabgl::iclamp;
 using std::string;
@@ -13,8 +14,12 @@ fabgl::VGAController DisplayController;
 fabgl::Canvas canvas(&DisplayController);
 
 constexpr uint64_t DEBOUNCE_DELAY_MILLIS = 12;
+constexpr uint8_t PULSES_PER_REV = 16;
+constexpr double WHEEL_RADIO = 0.32;
+constexpr uint64_t UPDATE_MEASURES_DELAY_MILLIS = 1000;
+
 const int pinEncoder = 12;
-unsigned int pulseCount = 0, cntTiempo = 0, bloqueTiempo;
+unsigned int pulseCount = 0, timeDif = 0, lastUpdatedMeasuresTime;
 float distanciaM = 0, distanciaT = 0;
 float distanciaPulsos, Vmps;
 unsigned long tAnt = 0;
@@ -73,14 +78,15 @@ struct SpeedOmeter : public Scene
     canvas.setGlyphOptions(GlyphOptions().DoubleWidth(0));
     canvas.setBrushColor(Color::Black);
 
-    cntTiempo = millis() - bloqueTiempo;
-    if (cntTiempo >= 1000)
+    const uint64_t currentTime = millis();
+    timeDif = currentTime - lastUpdatedMeasuresTime;
+    if (timeDif >= UPDATE_MEASURES_DELAY_MILLIS)
     {
-      bloqueTiempo += cntTiempo;
-      distanciaM = ((pulseCount / 16.0) * 2 * PI * 0.32);
+      distanciaM = (((double)pulseCount / PULSES_PER_REV)*2*PI*WHEEL_RADIO);
       distanciaT += distanciaM;
-      Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667;
+      Vmps = distanciaM / (timeDif / 1000.0) * 3.66667;
       pulseCount = 0;
+      lastUpdatedMeasuresTime = currentTime;
     }
 
     char strDistancia[20];
