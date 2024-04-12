@@ -1,8 +1,10 @@
 // #include<ESP32Time.h>
 #include <Arduino.h>
 #include "fabgl.h"
+#include "fabutils.h"
 #include <iostream>
 #include <stdlib.h>
+#include <Ps3Controller.h>
 #define MAX_V  6
 
 using fabgl::iclamp;
@@ -17,6 +19,10 @@ unsigned int cntPulsos;
 unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 12;
 
+uint64_t currentTime;
+uint64_t lastInputRecieved;
+constexpr uint64_t INPUT_DELAY = 200;
+
 // Funcion de interrupcion
 void IRAM_ATTR contadorPulsos_ISR()
 {
@@ -26,6 +32,99 @@ void IRAM_ATTR contadorPulsos_ISR()
     lastDebounceTime = millis();
   }
 }
+
+static constexpr uint8_t selection_arrow_bits[18] = {
+        0x00, 0x40, 0x00, 0x60, 0x00, 0x70, 0x1f, 0xf8, 0x1f, 0xfc, 0x1f, 0xf8,
+        0x00, 0x70, 0x00, 0x60, 0x00, 0x40
+    };
+Bitmap flecha_seleccion = Bitmap(16, 9, selection_arrow_bits, PixelFormat::Mask, RGB888(231, 158, 35));
+Sprite arrow;
+struct IntroScene : public Scene
+{
+  static const int TEXTROWS = 4;
+  static const int TEXT_X   = 130;
+  static const int TEXT_Y   = 122;
+  
+  int starting_ = 0;
+  int selectedLevel = 0;
+  uint8_t LEVEL_NUMBER = 5;
+  int start_pos=35;
+
+
+  IntroScene()
+  : Scene(0, 20, DisplayController.getViewPortWidth(), DisplayController.getViewPortHeight())
+  {
+  }
+
+  void init(){
+    canvas.selectFont(&fabgl::FONT_8x13);
+    canvas.setPenColor(255, 255, 255);
+    canvas.setBrushColor(255, 0, 0);
+    canvas.drawText(10, 10, "SELECCIONE UN NIVEL :D :");
+    canvas.selectFont(&fabgl::FONT_8x9);
+    canvas.drawText(16, 36, "Nivel 1");
+    canvas.drawText(16, 66, "Nivel 2");
+    canvas.drawText(16, 96, "Nivel 3");
+    canvas.drawText(16, 126, "Nivel 4");
+    canvas.drawText(16, 156, "Nivel 5");
+
+    arrow.addBitmap(&flecha_seleccion);
+    arrow.moveTo(1,35);
+    
+  }
+  void update(int updateCount){
+
+    if(starting_){
+      if(starting_ > 50){
+        stop();
+      }
+      ++starting_;
+      canvas.scroll(0, -5);
+    }
+
+    currentTime = millis();
+    if ((currentTime - lastInputRecieved) > INPUT_DELAY){
+      lastInputRecieved = currentTime;
+      if(Ps3.data.button.down){
+        selectedLevel=(selectedLevel + 1) % LEVEL_NUMBER;
+        arrow.y= start_pos + selectedLevel * 30;
+      }
+      else if(Ps3.data.button.up){
+        selectedLevel = (selectedLevel != 0)? selectedLevel - 1: LEVEL_NUMBER - 1;
+        arrow.y= start_pos + selectedLevel * 30;
+      }
+      else if(Ps3.data.button.cross){
+        switch(selectedLevel){
+          case 0:
+          starting_=true;
+              //Cantidad de pulsos
+              break;
+          case 1:
+          starting_=true;
+              break;
+          case 2:
+          starting_=true;
+              break;
+          case 3:
+          starting_=true;
+              break;
+          case 4:
+          starting_=true;
+              break;
+          default:
+              break;
+        }
+        
+      }
+    }
+    
+    DisplayController.refreshSprites();
+  }
+  void collisionDetected(Sprite * spriteA, Sprite * spriteB, Point collisionPoint){
+
+  }
+
+};
 
 
 const uint8_t barra[]{
@@ -180,6 +279,7 @@ void setup()
   Serial.begin(115200);
   pinMode(pinEncoder, INPUT);
   attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
+  Ps3.begin("78:dd:08:4d:94:a4");
   DisplayController.begin();
   DisplayController.setResolution(VGA_320x200_75Hz);
   Serial.println("¡Listo!");
@@ -187,7 +287,8 @@ void setup()
 
 void loop()
 {
-
+  IntroScene introScene;
+  introScene.start();
   SpeedOmeter speedOmeter;
   speedOmeter.start();
   // mediciones en el encoder
