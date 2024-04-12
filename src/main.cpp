@@ -5,7 +5,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <Ps3Controller.h>
-#define MAX_V  6
+#define MAX_V  40
 
 using fabgl::iclamp;
 using std::string;
@@ -60,7 +60,7 @@ struct IntroScene : public Scene
     canvas.selectFont(&fabgl::FONT_8x13);
     canvas.setPenColor(255, 255, 255);
     canvas.setBrushColor(255, 0, 0);
-    canvas.drawText(10, 10, "SELECCIONE UN NIVEL :D :");
+    canvas.drawText(10, 10, "SELECCIONE UN NIVEL:");
     canvas.selectFont(&fabgl::FONT_8x9);
     canvas.drawText(16, 36, "Nivel 1");
     canvas.drawText(16, 66, "Nivel 2");
@@ -70,6 +70,9 @@ struct IntroScene : public Scene
 
     arrow.addBitmap(&flecha_seleccion);
     arrow.moveTo(1,35);
+    arrow.visible=true;
+    DisplayController.setSprites(&arrow, 1);
+    
     
   }
   void update(int updateCount){
@@ -79,6 +82,8 @@ struct IntroScene : public Scene
         stop();
       }
       ++starting_;
+      canvas.setBrushColor(Color::Black);
+      arrow.visible=false;
       canvas.scroll(0, -5);
     }
 
@@ -207,11 +212,11 @@ struct SpeedOmeter : public Scene
     if (cntTiempo >= 1000)
     {
       bloqueTiempo += cntTiempo;
-      distanciaM = ((cntPulsos / 16.0) * 2 * PI * 0.32);
+      distanciaM = ((cntPulsos / 20.0) * 2 * PI * 0.32);
       distanciaT += distanciaM;
-      Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667;
+      Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667; // 3.6667 es para pasar los m/s a km/h
       
-      snprintf(strDistancia, 20, "%.2g", distanciaT);
+      snprintf(strDistancia, 20, "%.4g", distanciaT);
       snprintf(strVelocidad, 20, "%.2g", Vmps);
       cntPulsos = 0;
     }
@@ -249,14 +254,14 @@ struct SpeedOmeter : public Scene
     {
       sprites[2].visible= false;
     }
-    if(Vmps > MaxV/3){
+    if(Vmps > MaxV/2.3){
       sprites[3].visible= true;
     }
     else
     {
       sprites[3].visible= false;
     }
-    if(Vmps > MaxV/2){
+    if(Vmps > MaxV/1.5){
       sprites[4].visible= true;
     }
     else
