@@ -13,6 +13,12 @@ using std::string;
 fabgl::VGAController DisplayController;
 fabgl::Canvas canvas(&DisplayController);
 
+  const int PUL = 25;
+  const int DIR = 26;
+  const int ENA = 27;
+  int contador = 0;
+
+
 const int pinEncoder = 12;
 unsigned int cntPulsos;
 
@@ -24,6 +30,7 @@ uint64_t lastInputRecieved;
 constexpr uint64_t INPUT_DELAY = 200;
 
 // Funcion de interrupcion
+
 void IRAM_ATTR contadorPulsos_ISR()
 {
   if ((millis() - lastDebounceTime) > debounceDelay)
@@ -33,6 +40,7 @@ void IRAM_ATTR contadorPulsos_ISR()
   }
 }
 
+/*
 static constexpr uint8_t selection_arrow_bits[18] = {
         0x00, 0x40, 0x00, 0x60, 0x00, 0x70, 0x1f, 0xf8, 0x1f, 0xfc, 0x1f, 0xf8,
         0x00, 0x70, 0x00, 0x60, 0x00, 0x40
@@ -275,48 +283,62 @@ struct SpeedOmeter : public Scene
   {
   }
 };
+*/
 
 
 
 
 void setup()
 {
+  Ps3.begin("24:6f:28:af:1c:66");
   Serial.begin(115200);
-  pinMode(pinEncoder, INPUT);
+  /*pinMode(pinEncoder, INPUT);
   attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
-  Ps3.begin("78:dd:08:4d:94:a4");
   DisplayController.begin();
   DisplayController.setResolution(VGA_320x200_75Hz);
-  Serial.println("¡Listo!");
+  Serial.println("¡Listo!");*/
+
+  //Calibrador de pulsos
+
+    //Serial.begin(115200);
+    pinMode(PUL, OUTPUT);
+    pinMode(DIR,OUTPUT);
+    pinMode(ENA,OUTPUT);
+    
+    digitalWrite(ENA,LOW);
+  
+
 }
 
 void loop()
 {
-  IntroScene introScene;
+  /*IntroScene introScene;
   introScene.start();
   SpeedOmeter speedOmeter;
-  speedOmeter.start();
-  // mediciones en el encoder
-  /*
-  cntTiempo = millis() - bloqueTiempo;
-  if (cntTiempo >= 1000)
-  {
-    bloqueTiempo += cntTiempo;
+  speedOmeter.start();*/
 
-    distanciaM = ((cntPulsos / 16.0) * 2 * PI * 0.32);
-    distanciaT += distanciaM;
-    Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667;
-    Serial.print("Cant pulsos: ");
-    Serial.println(cntPulsos);
-    Serial.print("Distancia pulsos: ");
-    Serial.println(distanciaPulsos);
-    Serial.print("Distancia (m): ");
-    Serial.println(distanciaT);
-    Serial.print("Velocidad (km/h): ");
-    Serial.println(Vmps);
 
-    cntPulsos = 0;
+ if (Ps3.data.button.cross) {
+    digitalWrite(DIR,LOW);
+    for(int i = 0; i < 5; i++){
+        digitalWrite(PUL,HIGH);
+        delay(16);
+        digitalWrite(PUL, LOW);
+        delay(16);
+    }
   }
-  */
-  delay(1);
+  if (Ps3.data.button.circle) {
+    digitalWrite(DIR,HIGH);
+    for(int i = 0; i < 5; i++){
+        digitalWrite(PUL,HIGH);
+        delay(16);
+        digitalWrite(PUL, LOW);
+        delay(16);
+    }
+  }
+ 
+
+  
+  
+  //delay(1);
 }
