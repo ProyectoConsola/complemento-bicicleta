@@ -9,6 +9,7 @@
 #define MAX_V  40
 
 using fabgl::iclamp;
+
 using std::string;
 
 fabgl::VGAController DisplayController;
@@ -113,8 +114,24 @@ struct SpeedOmeter : public Scene
   }
   void update(int updateCount)
   {
+
+    if (Ps3.data.analog.stick.rx > 40 || Ps3.data.analog.stick.rx < -40)
+    {
+      if (Ps3.data.analog.stick.rx > 0)
+      {
+        if (Vmps <= MaxV - 1.0)
+          Vmps = Vmps + 1.0;
+      }
+      if (Ps3.data.analog.stick.rx < 0)
+      {
+        if (Vmps >= 1.0)
+          Vmps = Vmps - 1.0;
+      }
+    }
+        
+
     // Serial.println(updateCount);
-    if(vart != 0.0 && millis() - vart >= 10000000){
+    if(vart != 0.0 && millis() - vart >= 90000){
       sprites[0].visible = sprites[1].visible = sprites[2].visible = sprites[3].visible = sprites[4].visible = false;
       canvas.clear();
       stop();
@@ -125,11 +142,19 @@ struct SpeedOmeter : public Scene
       if (cntTiempo >= 1000)
       {
         bloqueTiempo += cntTiempo;
+
+        distanciaM = ((Vmps*1000)/3600) * (cntTiempo / 1000.0);
+        distanciaT += distanciaM;
+
+        /*
         distanciaM = ((cntPulsos / 20.0) * 2 * PI * 0.32);
         distanciaT += distanciaM;
-        Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667; // 3.6667 es para pasar los m/s a km/h
+        Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667;*/ // 3.6667 es para pasar los m/s a km/h
+
+
+
         potenciaf= Vmps*2.73;
-        if(Vmps> 5.0 && speedChange==false){
+        if(Vmps >= 1.0 && speedChange==false){
           speedChange=true;
           vart= millis();
         }
@@ -143,7 +168,7 @@ struct SpeedOmeter : public Scene
         sprintf(velocidad, "%.2g", Vmps);
         Serial.println((String)"Vmps:" + velocidad);
         sprintf(potencia, "%.2g", potencia);
-        Serial.println((String)"Potencia:" + potencia);
+        //Serial.println((String)"Potencia:" + potencia);
 
         cntPulsos = 0;
       }
@@ -258,7 +283,7 @@ struct FinalScene : public Scene
 
 void setup()
 {
-  //Ps3.begin("24:6f:28:af:1c:66");
+  Ps3.begin("24:6f:28:af:1c:66");
   Serial.begin(115200);
   pinMode(pinEncoder, INPUT);
   attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
