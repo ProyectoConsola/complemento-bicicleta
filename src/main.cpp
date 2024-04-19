@@ -284,7 +284,8 @@ void setup()
   Serial.begin(115200);
   pinMode(pinEncoder, INPUT);
   attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
-  Ps3.begin("78:dd:08:4d:94:a4");
+  //Ps3.begin("78:dd:08:4d:94:a4");
+  Ps3.begin("24:6f:28:af:1c:66");
   DisplayController.begin();
   DisplayController.setResolution(VGA_320x200_75Hz);
   Serial.println("¡Listo!");
