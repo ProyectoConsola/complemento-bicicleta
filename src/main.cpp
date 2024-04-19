@@ -4,6 +4,7 @@
 #include "fabutils.h"
 #include <iostream>
 #include <stdlib.h>
+#include <string>
 #include <Ps3Controller.h>
 #define MAX_V  40
 
@@ -13,8 +14,15 @@ using std::string;
 fabgl::VGAController DisplayController;
 fabgl::Canvas canvas(&DisplayController);
 
+//Variables del encoder
 const int pinEncoder = 12;
 unsigned int cntPulsos;
+
+
+float distanciaT;
+char velocidad[20];
+char distancia[20];
+char potencia[20];
 
 unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 12;
@@ -33,105 +41,7 @@ void IRAM_ATTR contadorPulsos_ISR()
   }
 }
 
-static constexpr uint8_t selection_arrow_bits[18] = {
-        0x00, 0x40, 0x00, 0x60, 0x00, 0x70, 0x1f, 0xf8, 0x1f, 0xfc, 0x1f, 0xf8,
-        0x00, 0x70, 0x00, 0x60, 0x00, 0x40
-    };
-Bitmap flecha_seleccion = Bitmap(16, 9, selection_arrow_bits, PixelFormat::Mask, RGB888(231, 158, 35));
-Sprite arrow;
-struct IntroScene : public Scene
-{
-  static const int TEXTROWS = 4;
-  static const int TEXT_X   = 130;
-  static const int TEXT_Y   = 122;
-  
-  int starting_ = 0;
-  int selectedLevel = 0;
-  uint8_t LEVEL_NUMBER = 5;
-  int start_pos=35;
-
-
-  IntroScene()
-  : Scene(0, 20, DisplayController.getViewPortWidth(), DisplayController.getViewPortHeight())
-  {
-  }
-
-  void init(){
-    canvas.selectFont(&fabgl::FONT_8x13);
-    canvas.setPenColor(255, 255, 255);
-    canvas.setBrushColor(255, 0, 0);
-    canvas.drawText(10, 10, "SELECCIONE UN NIVEL:");
-    canvas.selectFont(&fabgl::FONT_8x9);
-    canvas.drawText(16, 36, "Nivel 1");
-    canvas.drawText(16, 66, "Nivel 2");
-    canvas.drawText(16, 96, "Nivel 3");
-    canvas.drawText(16, 126, "Nivel 4");
-    canvas.drawText(16, 156, "Nivel 5");
-
-    arrow.addBitmap(&flecha_seleccion);
-    arrow.moveTo(1,35);
-    arrow.visible=true;
-    DisplayController.setSprites(&arrow, 1);
-    
-    
-  }
-  void update(int updateCount){
-
-    if(starting_){
-      if(starting_ > 50){
-        stop();
-      }
-      ++starting_;
-      canvas.setBrushColor(Color::Black);
-      arrow.visible=false;
-      canvas.scroll(0, -5);
-    }
-
-    currentTime = millis();
-    if ((currentTime - lastInputRecieved) > INPUT_DELAY){
-      lastInputRecieved = currentTime;
-      if(Ps3.data.button.down){
-        selectedLevel=(selectedLevel + 1) % LEVEL_NUMBER;
-        arrow.y= start_pos + selectedLevel * 30;
-      }
-      else if(Ps3.data.button.up){
-        selectedLevel = (selectedLevel != 0)? selectedLevel - 1: LEVEL_NUMBER - 1;
-        arrow.y= start_pos + selectedLevel * 30;
-      }
-      else if(Ps3.data.button.cross){
-        switch(selectedLevel){
-          case 0:
-          starting_=true;
-              //Cantidad de pulsos
-              break;
-          case 1:
-          starting_=true;
-              break;
-          case 2:
-          starting_=true;
-              break;
-          case 3:
-          starting_=true;
-              break;
-          case 4:
-          starting_=true;
-              break;
-          default:
-              break;
-        }
-        
-      }
-    }
-    
-    DisplayController.refreshSprites();
-  }
-  void collisionDetected(Sprite * spriteA, Sprite * spriteB, Point collisionPoint){
-
-  }
-
-};
-
-
+//sprites de barras
 const uint8_t barra[]{
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -152,22 +62,23 @@ Bitmap bitmapA = Bitmap(28, 30, barra, PixelFormat::Mask, RGB888(245, 200, 7));
 Bitmap bitmapN = Bitmap(28, 30, barra, PixelFormat::Mask, RGB888(255, 153, 0));
 Bitmap bitmapR = Bitmap(28, 30, barra, PixelFormat::Mask, RGB888(249, 28, 28));
 
-
-
 Sprite sprites[5];
 
 struct SpeedOmeter : public Scene
 {
-  static const int TEXTROWS = 4;
+  /*static const int TEXTROWS = 4;
   static const int TEXT_X = 130;
-  static const int TEXT_Y = 122;
-
-  float distanciaM=0, distanciaT=0;
-  float distanciaPulsos=0, Vmps=0;
-  unsigned int cntTiempo=0, bloqueTiempo=0;
+  static const int TEXT_Y = 122;*/
   float MaxV = MAX_V;
+
+  float distanciaM = 0.0, distanciaPulsos = 0.0;
+  float Vmps=0.0, potenciaf=0.0, vart = 0.0;
+  unsigned int cntTiempo=0, bloqueTiempo=0;
+  bool speedChange = false;
+  
   char strDistancia[20];
   char strVelocidad[20];
+  char strPotencia[20];
 
   SpeedOmeter()
       : Scene(0, 250, DisplayController.getViewPortWidth(), DisplayController.getViewPortHeight())
@@ -178,11 +89,9 @@ struct SpeedOmeter : public Scene
   {
     canvas.setBrushColor(Color::Black);
 
-    
     canvas.selectFont(&fabgl::FONT_6x8);
     canvas.setGlyphOptions(GlyphOptions().FillBackground(true));
     canvas.setGlyphOptions(GlyphOptions().DoubleWidth(1));
-    
     
     // Agregar sprites :D >:b
     sprites[0].addBitmap(&bitmapV);
@@ -198,125 +107,172 @@ struct SpeedOmeter : public Scene
     sprites[4].moveTo(260, 30);
 
     sprites[0].visible = true;
-    sprites[1].visible = false;
-    sprites[2].visible = false;
-    sprites[3].visible = false;
-    sprites[4].visible = false;
+    sprites[1].visible = sprites[2].visible = sprites[3].visible = sprites[4].visible = false;
 
     DisplayController.setSprites(sprites, 5);
   }
   void update(int updateCount)
   {
     // Serial.println(updateCount);
-    cntTiempo = millis() - bloqueTiempo;
-    if (cntTiempo >= 1000)
-    {
-      bloqueTiempo += cntTiempo;
-      distanciaM = ((cntPulsos / 20.0) * 2 * PI * 0.32);
-      distanciaT += distanciaM;
-      Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667; // 3.6667 es para pasar los m/s a km/h
+    if(vart != 0.0 && millis() - vart >= 10000000){
+      sprites[0].visible = sprites[1].visible = sprites[2].visible = sprites[3].visible = sprites[4].visible = false;
+      canvas.clear();
+      stop();
+    }
+    else{
+
+      cntTiempo = millis() - bloqueTiempo;
+      if (cntTiempo >= 1000)
+      {
+        bloqueTiempo += cntTiempo;
+        distanciaM = ((cntPulsos / 20.0) * 2 * PI * 0.32);
+        distanciaT += distanciaM;
+        Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667; // 3.6667 es para pasar los m/s a km/h
+        potenciaf= Vmps*2.73;
+        if(Vmps> 5.0 && speedChange==false){
+          speedChange=true;
+          vart= millis();
+        }
+        
+        snprintf(strDistancia, 20, "%4.4g", distanciaT);
+        snprintf(strVelocidad, 20, "%.2g", Vmps);
+        snprintf(strPotencia, 20, "%.2g", potenciaf);
+
+        sprintf(distancia, "%.2g", distanciaT);
+        Serial.println((String)"Distancia:" + distancia);
+        sprintf(velocidad, "%.2g", Vmps);
+        Serial.println((String)"Vmps:" + velocidad);
+        sprintf(potencia, "%.2g", potencia);
+        Serial.println((String)"Potencia:" + potencia);
+
+        cntPulsos = 0;
+      }
+
+      canvas.clear();
       
-      snprintf(strDistancia, 20, "%.4g", distanciaT);
-      snprintf(strVelocidad, 20, "%.2g", Vmps);
-      cntPulsos = 0;
-    }
+      //dibujar rectanugulo
+      canvas.setPenColor(128, 128, 128);
+      canvas.drawRectangle(257, 27, 290, 183);
 
-    canvas.clear();
-    
-    canvas.setPenColor(128, 128, 128);
-    canvas.drawRectangle(257, 27, 290, 183);
-    
-    canvas.setPenColor(255,255,255);
-    canvas.drawText(15, 60, "Distancia (m): ");
-    canvas.drawText(15, 80, strDistancia);
-    canvas.drawText(15, 100, "Velocidad (Km/h): ");
-    canvas.drawText(15, 120, strVelocidad);
+      canvas.selectFont(&fabgl::FONT_6x9);
+      canvas.setPenColor(140, 210, 245);
+      canvas.drawText(10, 10, "MEDIDOR DE VELOCIDAD");
 
-    if(Vmps > 0)
-    {
-      sprites[0].visible= true;
-    }
-    else
-    {
-      sprites[0].visible= false;
-    }
-    if(Vmps > MaxV/5){
-      sprites[1].visible= true;
-    }
-    else
-    {
-      sprites[1].visible= false;
-    }
-    if(Vmps > MaxV/4){
-      sprites[2].visible= true;
-    }
-    else
-    {
-      sprites[2].visible= false;
-    }
-    if(Vmps > MaxV/2.3){
-      sprites[3].visible= true;
-    }
-    else
-    {
-      sprites[3].visible= false;
-    }
-    if(Vmps > MaxV/1.5){
-      sprites[4].visible= true;
-    }
-    else
-    {
-      sprites[4].visible= false;
-    }
+      canvas.selectFont(&fabgl::FONT_6x8);
+      canvas.setPenColor(255,255,255);
+      canvas.drawText(15, 40, "Distancia (m): ");
+      canvas.drawText(15, 60, strDistancia);
+      canvas.drawText(15, 80, "Velocidad (Km/h): ");
+      canvas.drawText(15, 100, strVelocidad);
+      canvas.drawText(15, 120, "Potencia (W): ");
+      canvas.drawText(15, 140, strPotencia);
+      //Condiciones de velocidad
+      if(Vmps > 0)
+      {
+        sprites[0].visible= true;
+      }
+      else
+      {
+        sprites[0].visible= false;
+      }
+      if(Vmps > MaxV/5){
+        sprites[1].visible= true;
+      }
+      else
+      {
+        sprites[1].visible= false;
+      }
+      if(Vmps > MaxV/4){
+        sprites[2].visible= true;
+      }
+      else
+      {
+        sprites[2].visible= false;
+      }
+      if(Vmps > MaxV/2.3){
+        sprites[3].visible= true;
+      }
+      else
+      {
+        sprites[3].visible= false;
+      }
+      if(Vmps > MaxV/1.5){
+        sprites[4].visible= true;
+      }
+      else
+      {
+        sprites[4].visible= false;
+      }
     
-    
+    }
+  
   }
   void collisionDetected(Sprite *spriteA, Sprite *spriteB, Point collisionPoint)
   {
   }
+  
 };
+
+
+struct FinalScene : public Scene
+{
+  /*static const int TEXTROWS = 4;
+  static const int TEXT_X   = 130;
+  static const int TEXT_Y   = 122;
+  */
+  char strDistancia[20];
+
+
+  FinalScene()
+  : Scene(0, 20, DisplayController.getViewPortWidth(), DisplayController.getViewPortHeight())
+  {
+  }
+
+  void init(){
+    canvas.clear();
+    canvas.selectFont(&fabgl::FONT_9x18);
+    canvas.setPenColor(255, 255, 255);
+    canvas.setGlyphOptions(GlyphOptions().DoubleWidth(5));
+    canvas.drawText(20, 20, "SE HA ACABADO EL");
+    canvas.drawText(50,50, "EL TIEMPO !!!");
+    canvas.setGlyphOptions(GlyphOptions().DoubleWidth(1));
+
+    canvas.selectFont(&fabgl::FONT_8x13);
+    canvas.drawText(30, 100, "Distancia total: ");
+    snprintf(strDistancia, 20, "%.4g", distanciaT);
+    canvas.drawText(100, 120, strDistancia);
+    canvas.setGlyphOptions(GlyphOptions().DoubleWidth(1));
+  }
+  void update(int updateCount)
+  { 
+  }
+  void collisionDetected(Sprite * spriteA, Sprite * spriteB, Point collisionPoint)
+  {
+  }
+
+};
+
 
 
 
 
 void setup()
 {
+  //Ps3.begin("24:6f:28:af:1c:66");
   Serial.begin(115200);
   pinMode(pinEncoder, INPUT);
   attachInterrupt(digitalPinToInterrupt(pinEncoder), contadorPulsos_ISR, RISING);
-  Ps3.begin("78:dd:08:4d:94:a4");
   DisplayController.begin();
   DisplayController.setResolution(VGA_320x200_75Hz);
-  Serial.println("¡Listo!");
+
 }
 
 void loop()
 {
-  IntroScene introScene;
-  introScene.start();
   SpeedOmeter speedOmeter;
   speedOmeter.start();
-  // mediciones en el encoder
-  /*
-  cntTiempo = millis() - bloqueTiempo;
-  if (cntTiempo >= 1000)
-  {
-    bloqueTiempo += cntTiempo;
+  FinalScene finalScene;
+  finalScene.start();
 
-    distanciaM = ((cntPulsos / 16.0) * 2 * PI * 0.32);
-    distanciaT += distanciaM;
-    Vmps = distanciaM / (cntTiempo / 1000.0) * 3.66667;
-    Serial.print("Cant pulsos: ");
-    Serial.println(cntPulsos);
-    Serial.print("Distancia pulsos: ");
-    Serial.println(distanciaPulsos);
-    Serial.print("Distancia (m): ");
-    Serial.println(distanciaT);
-    Serial.print("Velocidad (km/h): ");
-    Serial.println(Vmps);
-
-    cntPulsos = 0;
-  }
-  */
-  delay(1);
+  delay(1000);
 }
